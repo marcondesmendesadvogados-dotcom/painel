@@ -67,7 +67,9 @@ function pelaRede(tent){
 }
 
 var copia = lerCopia();
-if (copia) abrir(copia, true); else pelaRede(0);
+// com a cópia, espera esta página terminar de ser lida (senão o navegador mistura as duas páginas)
+if (copia) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ abrir(copia, true); }); else abrir(copia, true); }
+else pelaRede(0);
 </script>
 </body>
 </html>
