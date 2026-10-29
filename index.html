@@ -27,7 +27,9 @@ function pedirPagina(){
 
 // roda dentro do painel quando ele abriu pela cópia guardada: busca a versão atual e avisa se mudou
 function conferirVersao(API, CHAVE){
-  var tent = 0;
+  var tent = 0, mexeu = false;
+  // se a pessoa ainda não clicou nem digitou nada, a versão nova entra sozinha; se já está usando, aparece o aviso para não atrapalhar
+  ['pointerdown', 'keydown'].forEach(function(ev){ document.addEventListener(ev, function(){ mexeu = true; }, { capture: true, once: true }); });
   function aviso(){
     var d = document.createElement('div');
     d.textContent = 'Saiu uma versão nova do painel. Toque aqui para atualizar.';
@@ -43,6 +45,7 @@ function conferirVersao(API, CHAVE){
         var velha = null; try { velha = localStorage.getItem(CHAVE); } catch (e) {}
         if (velha === j.r) return;
         try { localStorage.setItem(CHAVE, j.r); } catch (e) { try { localStorage.removeItem(CHAVE); } catch (e2) {} }
+        if (!mexeu) { location.reload(); return; }
         aviso();
       })
       .catch(function(){ if (tent < 2) { tent++; setTimeout(vai, tent * 4000); } });
