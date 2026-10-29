@@ -12,16 +12,62 @@
 <script>
 // Esta página só carrega o painel do servidor do escritório (Google Apps Script).
 // Nenhum dado de cliente fica aqui: os dados só vêm depois da senha.
+// Abertura rápida: guarda neste aparelho a última versão da página do painel (só o programa, sem dados),
+// abre com ela na hora e confere por trás se saiu versão nova.
 var API = 'https://script.google.com/macros/s/AKfycbz0hCs1CENK68NuWqdLtC2LwcxJblwlRfW6cWXn72L9uXOHpGca7CWZHkklJdPv4ZPf/exec';
+var CHAVE = 'painel_pagina_v1';
+
+function lerCopia(){ try { return localStorage.getItem(CHAVE); } catch (e) { return null; } }
+function salvarCopia(h){ try { localStorage.setItem(CHAVE, h); } catch (e) { try { localStorage.removeItem(CHAVE); } catch (e2) {} } }
+function pedirPagina(){
+  return fetch(API, { method: 'POST', credentials: 'omit', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ painelFn: 'pagina' }) })
+    .then(function(r){ return r.json(); })
+    .then(function(j){ if (!j || typeof j.r !== 'string' || j.r.length < 1000) throw new Error('vazio'); return j.r; });
+}
+
+// roda dentro do painel quando ele abriu pela cópia guardada: busca a versão atual e avisa se mudou
+function conferirVersao(API, CHAVE){
+  var tent = 0;
+  function aviso(){
+    var d = document.createElement('div');
+    d.textContent = 'Saiu uma versão nova do painel. Toque aqui para atualizar.';
+    d.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483647;background:#1f6feb;color:#fff;padding:11px 18px;border-radius:14px;font:600 13px Inter,system-ui,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.35);cursor:pointer;max-width:calc(100% - 32px);text-align:center';
+    d.onclick = function(){ location.reload(); };
+    (document.body || document.documentElement).appendChild(d);
+  }
+  function vai(){
+    fetch(API, { method: 'POST', credentials: 'omit', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ painelFn: 'pagina' }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || typeof j.r !== 'string' || j.r.length < 1000) throw new Error('vazio');
+        var velha = null; try { velha = localStorage.getItem(CHAVE); } catch (e) {}
+        if (velha === j.r) return;
+        try { localStorage.setItem(CHAVE, j.r); } catch (e) { try { localStorage.removeItem(CHAVE); } catch (e2) {} }
+        aviso();
+      })
+      .catch(function(){ if (tent < 2) { tent++; setTimeout(vai, tent * 4000); } });
+  }
+  setTimeout(vai, 2500);
+}
+
+function abrir(h, daCopia){
+  var extra = 'window.API_URL=' + JSON.stringify(API) + ';';
+  if (daCopia) extra += '(' + conferirVersao.toString() + ')(' + JSON.stringify(API) + ',' + JSON.stringify(CHAVE) + ');';
+  var pagina = h.replace('<script>', function(){ return '<script>' + extra + '</' + 'script><script>'; });
+  document.open(); document.write(pagina); document.close();
+}
 function falhou(){ document.getElementById('c').innerHTML = 'Não foi possível carregar o painel.<br><br><a href="" style="color:#8fc3ff">Tentar de novo</a>'; }
-fetch(API, { method: 'POST', credentials: 'omit', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ painelFn: 'pagina' }) })
-  .then(function(r){ return r.json(); })
-  .then(function(j){
-    if (!j || !j.r) return falhou();
-    var h = j.r.replace('<script>', '<script>window.API_URL=' + JSON.stringify(API) + ';</' + 'script><script>');
-    document.open(); document.write(h); document.close();
-  })
-  .catch(falhou);
+function pelaRede(tent){
+  pedirPagina()
+    .then(function(h){ salvarCopia(h); abrir(h, false); })
+    .catch(function(){
+      if (tent < 2) { document.getElementById('c').textContent = 'Conectando ao servidor…'; setTimeout(function(){ pelaRede(tent + 1); }, (tent + 1) * 1500); }
+      else falhou();
+    });
+}
+
+var copia = lerCopia();
+if (copia) abrir(copia, true); else pelaRede(0);
 </script>
 </body>
 </html>
